@@ -107,3 +107,41 @@ class ruby::ruby19($system_default = true)  {
   }
 
 }
+
+# setup ruby2.1 packages and install common dependencies and gems,
+# including bundler.
+#
+# If $system_default is true, then ruby2.1 will be the system-wide default
+# version of ruby
+
+class ruby::ruby21($system_default = true)  {
+  include ruby::common
+  package { ["ruby2.1", "ruby2.1-dev"]:
+    ensure => installed
+  }
+  Package["ruby2.1"] -> Package["ruby"]
+  Package["ruby2.1-dev"] -> Package["ruby-dev"]
+
+  Package["ruby2.1"] -> Package["bundler"]
+  Exec["ruby2.1-install-bundler"] -> Package["bundler"]
+
+  exec { "ruby2.1-install-bundler":
+    command => "/usr/bin/gem2.1 install -f --no-rdoc --no-ri --format-executable --bindir /usr/local/bin  bundler",
+    creates => "/usr/local/bin/bundle2.1",
+    require => Package["ruby2.1"]
+  }
+
+  exec { "bundle2.1-alternatives":
+    command => "/usr/sbin/update-alternatives --install /usr/bin/bundle bundle /usr/local/bin/bundle2.1 2",
+    require => Exec["ruby2.1-install-bundler"]
+  }
+  
+  if $system_default {
+    exec { "update-alternatives-ruby2.1":
+      path => "/usr/sbin",
+      command => "update-alternatives --set ruby /usr/bin/ruby2.1 && update-alternatives --set gem /usr/bin/gem2.1 && update-alternatives --set bundle /usr/local/bin/bundle2.1",
+      require => [Package["ruby"], Package["ruby2.1"], Exec["ruby2.1-install-bundler"]]
+    }
+  }
+
+}
